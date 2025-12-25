@@ -1,0 +1,103 @@
+
+--------------------------------------Step 1 to get the Data from spoutdata table----------------------------------------------------
+
+-----------------------After this data we have to put is in excel sheet for validation ----------------------------------------------
+
+SELECT ROW_NUMBER() OVER (ORDER BY [DATE], [SPOUTNO]) AS [S.No],
+[DATE],[PACKERNO],[SPOUTNO],[<49.5], [49.5-49.6],[49.6-49.7],[49.8-49.9],[50-50.2],[50.3-50.6],[50.6-51],[51-52], [>52] FROM
+    ( SELECT CAST(CAST(TimeDtFrmt AS DATE) AS varchar) AS [DATE],
+            PackerNo AS [PACKERNO],
+            SpoutNo AS [SPOUTNO],
+            SUM(CASE WHEN ActualWt < 49.5 THEN 1 ELSE 0 END) AS [<49.5],
+            SUM(CASE WHEN ActualWt >= 49.5 AND ActualWt < 49.6 THEN 1 ELSE 0 END) AS [49.5-49.6],
+			SUM(CASE WHEN ActualWt >= 49.6 AND ActualWt < 49.8 THEN 1 ELSE 0 END) AS [49.6-49.7],
+            SUM(CASE WHEN ActualWt >= 49.8 AND ActualWt < 50 THEN 1 ELSE 0 END) AS [49.8-49.9],
+            SUM(CASE WHEN ActualWt >= 50 AND ActualWt < 50.3 THEN 1 ELSE 0 END) AS [50-50.2],
+            SUM(CASE WHEN ActualWt >= 50.3 AND ActualWt < 50.6 THEN 1 ELSE 0 END) AS [50.3-50.6],
+            SUM(CASE WHEN ActualWt >= 50.6 AND ActualWt < 51 THEN 1 ELSE 0 END) AS [50.6-51],
+            SUM(CASE WHEN ActualWt >= 51 AND ActualWt < 52 THEN 1 ELSE 0 END) AS [51-52],
+            SUM(CASE WHEN ActualWt > 52 THEN 1 ELSE 0 END) AS [>52]
+        FROM SpoutData
+        WHERE PackerNo = 4
+            AND TimeDtFrmt BETWEEN  '2025-12-22 00:00:00' and '2025-12-22 09:00:00'
+        GROUP BY CAST(TimeDtFrmt AS DATE),PackerNo, SpoutNo
+    ) AS groupedData
+    ORDER BY [DATE],[PACKERNO], [SPOUTNO];
+
+
+
+-----------------------------------------average count --------------------------------------------------------
+
+select Spoutno,round(AVG(ActualWt),2) from SpoutData
+where TimeDtFrmt between '2025-12-22  00:00:00' and '2025-12-22 09:00:00' and PackerNo = 4 group by SpoutNo order by SpoutNo
+
+-----------------------------------------------Auto correction count------------------------------------------------------------
+
+select SpoutNo,AutoCorrectionRemarks,COUNT(PackerNo) as [Correction Count]
+from AUTO_CORRECTION_LOGS 
+where TimeDtFrmt between '2025-12-21 11:00:00' and '2025-12-21 23:59:59'and PackerNo = 4 and AutoCorrectionRemarks = 'Correction done'
+group by SpoutNo,AutoCorrectionRemarks 
+order by SpoutNo;
+-------------------------------------------------------Auto correction not done count-------------------------------------------
+select SpoutNo,AutoCorrectionRemarks,COUNT(PackerNo) as [Correction Count]
+from AUTO_CORRECTION_LOGS 
+where TimeDtFrmt between '2025-12-21 11:00:00' and '2025-12-21 23:59:59'and PackerNo = 4 and
+AutoCorrectionRemarks = 'Correction Not done, Due to weight fluctuation'
+group by SpoutNo,AutoCorrectionRemarks 
+order by SpoutNo;
+
+----------------------------------------------- CPS correction Count-----------------------------------------------------------------
+
+
+select SpoutNo,Count(CPSDiff) from (
+select SpoutNo,round((cast(CPS as float) - cast(NextCPS as float)),2) as CPSDiff from (select  SpoutNo, Field01 as CPS, 
+Lead (Field01) over ( order by SpoutNo,TimeDtFrmt) As NextCPS
+from SpoutData
+where TimeDtFrmt between '2025-12-22  00:00:00' and '2025-12-22 09:00:00' and PackerNo = 4 
+) as TMP where TMP.NextCPS <> TMP.CPS and TMP.NextCPS is not null ) as tbl where tbl.CPSDiff > 0 group by SpoutNo
+
+---------------------------------------------------CPS Positive Avg------------------------------------------------------------
+
+select SpoutNo,round(avg(CPSDiff),2) from (
+select SpoutNo,round((cast(CPS as float) - cast(NextCPS as float)),2) as CPSDiff from (select  SpoutNo, Field01 as CPS, 
+Lead (Field01) over ( order by SpoutNo,TimeDtFrmt) As NextCPS
+from SpoutData
+where TimeDtFrmt between '2025-12-22  00:00:00' and '2025-12-22 09:00:00' and PackerNo = 4 
+) as TMP where TMP.NextCPS <> TMP.CPS and TMP.NextCPS is not null ) as tbl where tbl.CPSDiff > 0 group by SpoutNo
+
+
+------------------------------------------CPS Negative Avg ---------------------------------------------------------------------
+
+
+select SpoutNo,round(avg(CPSDiff),2) from (
+select SpoutNo,round((cast(CPS as float) - cast(NextCPS as float)),2) as CPSDiff from (select  SpoutNo, Field01 as CPS, 
+Lead (Field01) over ( order by SpoutNo,TimeDtFrmt) As NextCPS
+from SpoutData
+where TimeDtFrmt between '2025-12-22  00:00:00' and '2025-12-22 09:00:00' and PackerNo = 4
+) as TMP where TMP.NextCPS <> TMP.CPS and TMP.NextCPS is not null ) as tbl where tbl.CPSDiff < 0 group by SpoutNo
+
+
+
+
+-----------------------------------------   Final Adj weight Positive Avg    ----------------------------------------------------
+
+select SpoutNo,round(avg(FinalAdjWtDiff),2) as CorrectedValue from (
+select SpoutNo,
+round((FinalAdjWt - NextFinalAdjWt),2) as FinalAdjWtDiff from
+(select  SpoutNo, round((TargetWt -Current_FinalWt),2) as FinalAdjWt, 
+Lead (round((TargetWt- Current_FinalWt),2)) over ( order by SpoutNo,TimeDtFrmt) As NextFinalAdjWt
+from SpoutData
+where TimeDtFrmt between '2025-12-22  00:00:00 'and '2025-12-22 09:00:00' and PackerNo = 4
+) as TMP 
+where TMP.FinalAdjWt <> TMP.NextFinalAdjWt and TMP.FinalAdjWt is not null ) as tbl where tbl.FinalAdjWtDiff > 0  group by SpoutNo;
+
+-----------------------------------------------------------------Final Adj weight Negative Avg --------------------------------------
+select SpoutNo,round(avg(FinalAdjWtDiff),2) as CorrectedValue from (
+select SpoutNo,
+round((FinalAdjWt - NextFinalAdjWt),2) as FinalAdjWtDiff from
+(select  SpoutNo, round((TargetWt -Current_FinalWt),2) as FinalAdjWt, 
+Lead (round((TargetWt- Current_FinalWt),2)) over ( order by SpoutNo,TimeDtFrmt) As NextFinalAdjWt
+from SpoutData
+where TimeDtFrmt between '2025-12-21 11:00:00 ' and '2025-12-21 23:59:59 ' and PackerNo = 4
+) as TMP 
+where TMP.FinalAdjWt <> TMP.NextFinalAdjWt and TMP.FinalAdjWt is not null ) as tbl where tbl.FinalAdjWtDiff < 0  group by SpoutNo;
