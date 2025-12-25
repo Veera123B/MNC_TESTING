@@ -1,0 +1,40 @@
+WITH MISSING_SPOUT AS (
+    SELECT
+        SpoutNo,
+        TimeDtFrmt,
+        SUM(CASE WHEN SpoutNo = 1 THEN 1 ELSE 0 END)
+            OVER (ORDER BY TimeDtFrmt) AS CycleNo,
+        LAG(SpoutNo) OVER (ORDER BY TimeDtFrmt) AS PrevSpout,
+        LAG(TimeDtFrmt) OVER (ORDER BY TimeDtFrmt) AS PrevTime
+    FROM SPOUTDATA
+    WHERE PackerNo = 4
+	AND TimeDtFrmt BETWEEN '2025-12-21 00:00:00' AND '2025-12-21 11:00:00'
+)
+SELECT 
+    CycleNo,
+    CASE 
+        WHEN PrevSpout = 8 THEN 1
+        ELSE PrevSpout + 1
+    END AS MissingSpout,
+	PrevTime
+FROM MISSING_SPOUT
+
+WHERE PrevSpout IS NOT NULL
+  AND SpoutNo <> CASE 
+                    WHEN PrevSpout = 8 THEN 1
+                    ELSE PrevSpout + 1
+                 END
+ORDER BY CycleNo;
+
+
+SELECT SpoutNo,SUM(MISSINGSPOUTS) FROM 
+	( SELECT * ,DATEDIFF (SECOND , TimeDtFrmt , NEXT_DATA) AS SecondsDifference ,
+				  (DATEDIFF (SECOND , TimeDtFrmt , NEXT_DATA) / 16) - 1 AS MISSINGSPOUTS
+FROM 
+	(SELECT SpoutNo , TimeDtFrmt, LEAD(TimeDtFrmt) OVER (PARTITION BY SPOUTNO ORDER BY TimeDtFrmt) 
+	AS NEXT_DATA FROM SPOUTDATA 
+WHERE PackerNo = 4 AND TimeDtFrmt
+	BETWEEN '2025-12-21 00:00:00' AND '2025-12-21 11:00:59') AS T) as D 
+	WHERE D.SecondsDifference < 100 
+	AND D.SecondsDifference > 18 
+	GROUP BY d.SpoutNo
