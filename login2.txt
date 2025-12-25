@@ -38,3 +38,6 @@ WHERE PackerNo = 4 AND TimeDtFrmt
 	WHERE D.SecondsDifference < 100 
 	AND D.SecondsDifference > 18 
 	GROUP BY d.SpoutNo
+
+
+Changes done
