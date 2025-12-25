@@ -145,6 +145,10 @@ SELECT SUBSTRING(EMAIL,2,9) FROM  MNC_Large_Sales_Data_50000
 SELECT * FROM MNC_Large_Sales_Data_50000
 
 
+completed
+
+
+
 
 
 
