@@ -101,3 +101,36 @@ from SpoutData
 where TimeDtFrmt between '2025-12-21 11:00:00 ' and '2025-12-21 23:59:59 ' and PackerNo = 4
 ) as TMP 
 where TMP.FinalAdjWt <> TMP.NextFinalAdjWt and TMP.FinalAdjWt is not null ) as tbl where tbl.FinalAdjWtDiff < 0  group by SpoutNo;
+
+
+
+
+SELECT
+    CAST(TimeDtFrmt AS DATE) AS [Date],
+    PackerNo,
+
+    SUM(CASE WHEN ActualWt < 45 THEN 1 ELSE 0 END) AS [Below 45],
+    SUM(CASE WHEN ActualWt >= 45 AND ActualWt < 46 THEN 1 ELSE 0 END) AS [45-46],
+    SUM(CASE WHEN ActualWt >= 46 AND ActualWt < 47 THEN 1 ELSE 0 END) AS [46-47],
+    SUM(CASE WHEN ActualWt >= 47 AND ActualWt < 48 THEN 1 ELSE 0 END) AS [47-48],
+    SUM(CASE WHEN ActualWt >= 48 AND ActualWt < 49 THEN 1 ELSE 0 END) AS [48-49],
+    SUM(CASE WHEN ActualWt >= 49 AND ActualWt < 49.5 THEN 1 ELSE 0 END) AS [49-49.5],
+    SUM(CASE WHEN ActualWt >= 49.5 AND ActualWt < 49.6 THEN 1 ELSE 0 END) AS [49.5-49.6],
+    SUM(CASE WHEN ActualWt >= 49.6 AND ActualWt < 49.8 THEN 1 ELSE 0 END) AS [49.6-49.8],
+    SUM(CASE WHEN ActualWt >= 49.8 AND ActualWt < 50 THEN 1 ELSE 0 END) AS [49.8-50],
+    SUM(CASE WHEN ActualWt >= 50 AND ActualWt < 50.3 THEN 1 ELSE 0 END) AS [50-50.3],
+    SUM(CASE WHEN ActualWt >= 50.3 AND ActualWt < 50.6 THEN 1 ELSE 0 END) AS [50.3-50.6],
+    SUM(CASE WHEN ActualWt >= 50.6 AND ActualWt < 51 THEN 1 ELSE 0 END) AS [50.6-51],
+    SUM(CASE WHEN ActualWt >= 51 AND ActualWt < 52 THEN 1 ELSE 0 END) AS [51-52],
+    SUM(CASE WHEN ActualWt > 52 THEN 1 ELSE 0 END) AS [Above 52]
+FROM dbo.SpoutData
+WHERE PackerNo = 1
+  AND TimeDtFrmt >= '2026-07-01'
+  AND TimeDtFrmt <= '2026-07-31'
+GROUP BY
+    CAST(TimeDtFrmt AS DATE),
+    PackerNo
+ORDER BY
+    [Date],
+    PackerNo
+   
